@@ -166,7 +166,7 @@ router.put('/:user_id(\\d+)/change_password', (req, res) => {
 	const { password, password_confirm, password_old } = req.body;
 
 	try {
-		db.task(async t => {
+		db.task('user/change_password', async t => {
 			// Note: We want these requests to be blocking so errors come back
 			// deterministically. It's a bit slower, but also more consistent.
 			//
