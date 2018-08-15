@@ -161,80 +161,86 @@ router.put('/:user_id(\\d+)/undelete', async (req, res) => {
 	}
 })
 
-router.put('/:user_id(\\d+)/change_password', async (req, res) => {
+router.put('/:user_id(\\d+)/change_password', (req, res) => {
 	const { user_id } = req.params;
 	const { password, password_confirm, password_old } = req.body;
 
-	// Note: We want these requests to be blocking so errors come back
-	// deterministically. It's a bit slower, but also more consistent.
-
-	// Ensure provided current password is correct
 	try {
-		const user = await db.one(
-			`
-				SELECT password
-				FROM users
-				WHERE id = $(user_id)
-			`,
-			{
-				user_id,
-			},
-		);
-
-		const match = await bcrypt.compare(password_old, user.password);
-
-		if (!match) {
-			return res.status(400).json({
-				errors: [
+		db.task(async t => {
+			// Note: We want these requests to be blocking so errors come back
+			// deterministically. It's a bit slower, but also more consistent.
+			//
+			// Ensure provided current password is correct
+			try {
+				const user = await t.one(
+					`
+						SELECT password
+						FROM users
+						WHERE id = $(user_id)
+					`,
 					{
-						status: 400,
-						source: {
-							pointer: req.baseUrl,
-						},
-						title: 'Invalid password',
-						message: 'Current password is incorrect.'
-					}
-				]
-			})
-		}
-	} catch (err) {
-		return res.status(500).json(err);
-	}
-
-	// Ensure passwords match
-	if (password !== password_confirm) {
-		return res.status(400).json({
-			errors: [
-				{
-					status: 400,
-					source: {
-						pointer: req.baseUrl,
+						user_id,
 					},
-					title: 'Passwords did not match',
-					message: 'Provided passwords did not match.',
+				);
+
+				const match = await bcrypt.compare(password_old, user.password);
+
+				if (!match) {
+					return res.status(400).json({
+						errors: [
+							{
+								status: 400,
+								source: {
+									pointer: req.baseUrl,
+								},
+								title: 'Invalid password',
+								message: 'Current password is incorrect.'
+							}
+						],
+					});
 				}
-			]
-		});
-	}
+			} catch (err) {
+				return res.status(500).json(err);
+			}
 
-	// Update password
-	try {
-		const user = await db.one(
-			`
-				UPDATE users
-				SET password = $(password)
-				WHERE id = $(user_id)
-				RETURNING
-					id
-			`,
-			{
-				user_id,
-				password: await bcrypt.hash(password, 10),
-			},
-		);
+			// Ensure passwords match
+			if (password !== password_confirm) {
+				return res.status(400).json({
+					errors: [
+						{
+							status: 400,
+							source: {
+								pointer: req.baseUrl,
+							},
+							title: 'Passwords did not match',
+							message: 'Provided passwords did not match.',
+						}
+					]
+				});
+			}
 
-		return res.status(200).json({
-			data: user,
+			// Update password
+			try {
+				const user = await t.one(
+					`
+						UPDATE users
+						SET password = $(password)
+						WHERE id = $(user_id)
+						RETURNING
+							id
+					`,
+					{
+						user_id,
+						password: await bcrypt.hash(password, 10),
+					},
+				);
+
+				return res.status(200).json({
+					data: user,
+				});
+			} catch (err) {
+				return res.status(500).json(err);
+			}
 		});
 	} catch (err) {
 		return res.status(500).json(err);
