@@ -1,5 +1,10 @@
 const pgp = require('pg-promise')({});
-const connectionString = 'postgres://localhost:5432/tim_twitter';
-const db = pgp(connectionString);
+
+const config = {
+	host: 'localhost',
+	port: 5432,
+	database: 'tim_twitter',
+};
+const db = pgp(config);
 
 module.exports = db;
