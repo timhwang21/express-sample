@@ -17,4 +17,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
+app.all('/*', (req, res) => {
+	res.status(404).json({
+		errors: [
+			{
+				status: 404,
+				source: {
+					pointer: req.url,
+				},
+				title: 'Route not found',
+				detail: `'${req.method} on ${req.url} not found'`,
+			},
+		],
+	})
+})
+
 module.exports = app;
